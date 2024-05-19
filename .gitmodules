@@ -1,0 +1,3 @@
+[submodule "subprojects/zasm"]
+	path = subprojects/zasm
+	url = https://github.com/Duckos-Mods/zasm-static.git
