@@ -19,7 +19,7 @@ namespace Craft
 		u16 remainingArgs = (u16)functionArguments.size() - 4;
 		u16 startingIndex = 4;
 
-		for (u16 i = (u16)functionArguments.size()-1; i >= startingIndex; i--) // We need to reverse the loop so we can get the correct order of the arguments
+		for (u16 i = 4; i < functionArguments.size(); i++)
 			inf.argumentLocationInfo.push_back(InternalCalculations::ComputeTypeHookInfo(functionArguments[i], i));
 
 		return inf;
