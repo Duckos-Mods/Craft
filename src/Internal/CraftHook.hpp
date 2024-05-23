@@ -21,23 +21,32 @@ namespace Craft
     class ManagerHook
     {
     private:
+        struct DataSync
+        {
+            UnkIntegral mArg1Value{};
+            UnkData mArg1Pointer{};
+            UnkIntegral mArg2Value{};
+            UnkData mArg2Pointer{};
+            UnkIntegral mArg3Value{};
+            UnkData mArg3Pointer{};
+            UnkIntegral mArg4Value{};
+            UnkData mArg4Pointer{};
+            DataSync() = default;
+        };
         std::vector<UnkFunc>* mPreHooks{};
         std::vector<UnkFunc>* mPostHooks{};
-        UnkIntegral* mArg1{};
-        UnkIntegral* mArg2{};
-        UnkIntegral* mArg3{};
-        UnkIntegral* mArg4{}; // Storage for register based arguments that require pointers to them
+        DataSync* mDataSync{};
         UnkFunc ReplaceHook{};
         struct OriginalFunc
         {
             u8* mOriginalBytes{};
-            u32 mSize{};
+            uSize mSize{};
             UnkFunc mOriginalFunc{};
         };
         struct Trampoline
         {
 			u8* mTrampoline{};
-			u32 mSize{};
+			uSize mSize{};
 		};
         OriginalFunc mOriginalFunc{};
 		Trampoline mTrampoline{};
@@ -46,9 +55,14 @@ namespace Craft
         void setupMemory(UnkFunc originalFunc);
         void installThunk();
         void generateASM(NeededHookInfo& hookInfo);
+        PointerWrapper VariableLocationToDataSyncLocation(VariableLocations location, bool isBackup);
 
     public:
         ManagerHook() {}
+        ManagerHook(ManagerHook&) = delete;
+        ManagerHook& operator=(ManagerHook&) = delete; // Disallow copying of this class
+        ManagerHook(ManagerHook&&) = default;
+        ManagerHook& operator=(ManagerHook&&) = default;
 
         void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, bool pauseThreads = true);
         
@@ -56,7 +70,7 @@ namespace Craft
         void AddHook(UnkFunc hookFunc, HookType hookType, bool pauseThreads = true);
 
 
-
+        TEST_ONLY(UnkFunc GetTrampoline() { return this->mTrampoline.mTrampoline; })
         
 
     };
