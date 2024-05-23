@@ -42,6 +42,12 @@ using protType = int;
 #define RELEASE_ONLY(x) x
 #endif
 #endif
+#define CRAFT_TESTS 
+#ifdef CRAFT_TESTS
+#define TEST_ONLY(x) x
+#else
+#define TEST_ONLY(x)
+#endif
 
 
 #if CRAFT_NO_THROW == 0 && CRAFT_CUSTOM_THROW == 0
@@ -68,6 +74,17 @@ using protType = int;
 #ifndef UNROLL_EXPECTED
 #define UNROLL_EXPECTED(exp) ((exp.has_value()) ? exp.value() : CRAFT_THROW(exp.error()))
 #endif
+#ifndef CRAFT_CUSTOM_ALLOCATION_SIZE
+namespace Craft {
+	constexpr uint32_t cAllocSize = 4096;
+}
+#else
+namespace Craft {
+	constexpr uint32_t cAllocSize = CRAFT_CUSTOM_ALLOCATION_SIZE;
+}
+#endif
+
+#define STACK_MAGIC_NUMBER 40
 
 namespace Craft
 {
@@ -86,7 +103,27 @@ namespace Craft
 	template<size_t size>
 	using UnkPad = std::array<u8, size>;
 	using UnkIntegral = UnkPad<8>;
+	using UnkData = void*;
 
+	union PointerWrapper
+	{
+		UnkData pointer = nullptr;
+		u64 value;
+
+		template<typename T>
+		PointerWrapper(T* ptr) : pointer(reinterpret_cast<UnkData>(ptr)) {}
+		PointerWrapper() = default;
+		PointerWrapper(u64 val) : value(val) {}
+
+		template<typename T>
+		operator T* () const { return reinterpret_cast<T*>(pointer); }
+		operator u64() const { return value; }
+
+		template<typename T>
+		T* as() const { return reinterpret_cast<T*>(pointer); }
+
+
+	};
 
 
 }
