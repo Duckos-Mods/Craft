@@ -32,7 +32,7 @@ namespace Craft
 
 		CloseHandle(hSnap);
 	}
-	AllOSThreads::~AllOSThreads()
+	AllOSThreads::~AllOSThreads() noexcept(false)
 	{
 		// Unlock all threads
 		HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
