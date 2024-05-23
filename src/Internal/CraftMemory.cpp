@@ -105,7 +105,8 @@ namespace Craft
 		if (!access.ToOsProtection().has_value())
 			return std::unexpected(access.ToOsProtection().error());
 		prot = access.ToOsProtection().value();
-		VirtualProtect(data, Count, prot, nullptr);
+		protType oldProt;
+		VirtualProtect(data, Count, prot, &oldProt);
 		return data;
 
 		if (!access.ToOsProtection().has_value())
