@@ -12,7 +12,7 @@ namespace Craft
 	{
 	public:
 		AllOSThreads();
-		~AllOSThreads();
+		~AllOSThreads() noexcept(false);
 
 		AllOSThreads(const AllOSThreads&) = delete;
 		AllOSThreads& operator=(const AllOSThreads&) = delete;
