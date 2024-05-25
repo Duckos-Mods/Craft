@@ -39,6 +39,9 @@ namespace Craft
 		this->mOriginalFunc.mSize = (u32)ASMUtil::GetMinBytesForNeededSize(originalFunc, 14);
 		this->mOriginalFunc.mOriginalBytes = new u8[this->mOriginalFunc.mSize];
 		memcpy(this->mOriginalFunc.mOriginalBytes, originalFunc, this->mOriginalFunc.mSize);
+		TEST_ONLY(
+			this->mDataSync->mStackPointer = 0;
+		)
 
 		this->mTrampoline.mSize = cAllocSize;
 		this->mTrampoline.mTrampoline = memory;
@@ -192,6 +195,10 @@ namespace Craft
 
 		}
 		a.pop(r10);
+		u16 stackReservationSize = (hookInfo.argumentLocationInfo.size() > 4) ? 1 : 0;
+		if (stackReservationSize == 1)
+			stackReservationSize = (hookInfo.argumentLocationInfo.size() - 4) * 8;
+		TEST_LOG("Stack Reservation Size: {}", stackReservationSize);
 		// Setup Registerts
 		for (i16 i = 0; i < regLoopCount; i++)
 		{
@@ -204,9 +211,6 @@ namespace Craft
 			PointerWrapper data = VariableLocationToDataSyncLocation(loc, false); // Obtains a pointer to the register data
 			a.mov(VariableLocationToGp64(loc), data.value);
 		}
-		a.push(r10);
-		a.mov(r10, rsp);
-		a.add(r10, 10);
 		a.push(r15);
 		a.push(r14);
 		// Call the pre hooks
@@ -217,6 +221,7 @@ namespace Craft
 		a.mov(r14, qword_ptr(r15, 8)); // Last Element In The Array Pointer
 		a.mov(r15, qword_ptr(r15)); // Start Pointer
 
+		// Only debug code
 		TEST_ONLY(a.int3());
 		Label ll = a.createLabel("preHooksLoopStart");
 		a.bind(ll);
@@ -232,7 +237,6 @@ namespace Craft
 		a.bind(l);
 		a.pop(r14);
 		a.pop(r15);
-		a.pop(r10);
 
 		// Restore everything i hope
 		a.mov(rsp, rbp); // mov rsp, rbp // Restore stack pointer
@@ -293,6 +297,9 @@ namespace Craft
 
 		// installThunk(); // Do this last so if threads are not paused we hopefully dont jump while building the hook
 
+	}
+	void ManagerHook::AddHook(UnkFunc hookFunc, HookType hookType, bool pauseThreads)
+	{
 	}
 }
 

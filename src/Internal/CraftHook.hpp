@@ -31,6 +31,9 @@ namespace Craft
             UnkData mArg3Pointer{};
             UnkIntegral mArg4Value{};
             UnkData mArg4Pointer{};
+            TEST_ONLY(
+                u64 mStackPointer{};
+            )
             DataSync() = default;
         };
         std::vector<UnkFunc>* mPreHooks{};
@@ -56,6 +59,11 @@ namespace Craft
         void installThunk();
         void generateASM(NeededHookInfo& hookInfo);
         PointerWrapper VariableLocationToDataSyncLocation(VariableLocations location, bool isBackup);
+        TEST_ONLY(PointerWrapper getStackPointerAddress()
+        {
+            return &this->mDataSync->mStackPointer;
+        }
+        )
 
     public:
         ManagerHook() {}
@@ -70,6 +78,10 @@ namespace Craft
         void AddHook(UnkFunc hookFunc, HookType hookType, bool pauseThreads = true);
 
 
+        void AddNewFuncToHooksWithNoProcess(UnkFunc ptr) 
+        { 
+            this->mPreHooks->push_back(ptr);
+        }
         TEST_ONLY(UnkFunc GetTrampoline() { return this->mTrampoline.mTrampoline; })
         
 
