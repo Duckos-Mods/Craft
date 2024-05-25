@@ -22,9 +22,10 @@ static int HookTarget(int i, float, float, thing, thing*, thing*)
 }
 
 [[nodiscard]]
-static void PreHook(int& i, float&, float&, thing, thing&)
+static void PreHook(int& i, float&, float&, thing, thing*, thing*)
 {
 	std::println("PreHook I={}", i);
+    i++;
 }
 
 
@@ -44,32 +45,7 @@ void* lftrw(FunctionPtr func)
     }
     return (void*)target;
 }
-[[noreturn]]
-int main()
-{
-    constexpr Craft::TypeInformation returnTi = Craft::GetTypeInformation<int>();
-    std::vector<Craft::TypeInformation> argTI;
-    argTI.push_back(Craft::GetTypeInformation<int>());
-    argTI.push_back(Craft::GetTypeInformation<float>());
-    argTI.push_back(Craft::GetTypeInformation<float>());
-    argTI.push_back(Craft::GetTypeInformation<thing>());
-    argTI.push_back(Craft::GetTypeInformation<thing*>());
-    argTI.push_back(Craft::GetTypeInformation<thing*>());
-
-    Craft::NeededHookInfo nhi = Craft::GetNeededHookInfo(returnTi, argTI);
 
 
-    Craft::ManagerHook mh;
-    mh.CreateManagerHook(HookTarget, PreHook, nhi, Craft::HookType::PreHook);
-    auto* trampPointer = mh.GetTrampoline();
-    auto* tramp = reinterpret_cast<int(*)(int, float, float, thing, thing*, thing*)>(trampPointer);
-    int i = 50;
-    float f = 1.0f;
-    thing t1{ 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
-
-    tramp(i, f, 2.f, t1, (thing*)123456789, (thing*)987654321);
-
-
-    return 0;
-
+int main() {
 }
