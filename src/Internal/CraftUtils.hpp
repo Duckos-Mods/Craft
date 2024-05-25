@@ -44,9 +44,12 @@ using protType = int;
 #endif
 #define CRAFT_TESTS 
 #ifdef CRAFT_TESTS
+#include <print>
 #define TEST_ONLY(x) x
+#define TEST_LOG(FORMAT, ...) std::println(FORMAT, __VA_ARGS__)
 #else
 #define TEST_ONLY(x)
+#define TEST_LOG(FORMAT, ...)
 #endif
 
 
@@ -83,9 +86,17 @@ namespace Craft {
 	constexpr uint32_t cAllocSize = CRAFT_CUSTOM_ALLOCATION_SIZE;
 }
 #endif
-
-#define STACK_MAGIC_NUMBER 40
-
+#ifndef SHADOW_SPACE_ALLOCATION_SIZE
+#define SHADOW_SPACE_ALLOCATION_SIZE 32
+#endif
+#ifndef RETURN_ADDRESS_SIZE
+#define RETURN_ADDRESS_SIZE 8 
+// This isnt actually the size of the return address. This handles alignment due to shadow space being 32 bytes 
+// The return address is 8 bytes but since the stack pointer needs to be 16 aligned there is an extra 8 bytes pushed 
+#endif
+#ifndef STACK_MAGIC_NUMBER
+#define STACK_MAGIC_NUMBER (SHADOW_SPACE_ALLOCATION_SIZE + RETURN_ADDRESS_SIZE)
+#endif
 namespace Craft
 {
 	using u8 = unsigned char;
@@ -121,8 +132,6 @@ namespace Craft
 
 		template<typename T>
 		T* as() const { return reinterpret_cast<T*>(pointer); }
-
-
 	};
 
 
