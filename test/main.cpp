@@ -48,4 +48,5 @@ void* lftrw(FunctionPtr func)
 
 
 int main() {
+    return 0;
 }
