@@ -12,4 +12,4 @@ namespace Craft
 		UNKNOWN_PROTECTION,
 		NO_MEMORY_IN_RANGE,
 	};
-}
+} 

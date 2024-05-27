@@ -16,12 +16,6 @@
 #include <Windows.h>
 using protType = DWORD;
 #elif defined(__linux__)
-#define CRAFT_PLATFORM_LINUX 1
-#include <unistd.h>
-#include <sys/mman.h>
-#include <unistd.h>
-using protType = int;
-#else
 #error "Unsupported platform"
 #endif
 
@@ -52,6 +46,11 @@ using protType = int;
 #define TEST_LOG(FORMAT, ...)
 #endif
 
+#ifndef CRAFT_MAX_EXPECTED_STACK_ARGS
+#define CRAFT_MAX_EXPECTED_STACK_ARGS 32
+#elif CRAFT_MAX_EXPECTED_STACK_ARGS < 4
+#error "CRAFT_MAX_EXPECTED_STACK_ARGS must be greater than 4. A value higer or equal to 32 is ideal"
+#endif
 
 #if CRAFT_NO_THROW == 0 && CRAFT_CUSTOM_THROW == 0
 #include <exception>
@@ -76,16 +75,31 @@ using protType = int;
 
 #ifndef UNROLL_EXPECTED
 #define UNROLL_EXPECTED(exp) ((exp.has_value()) ? exp.value() : CRAFT_THROW(exp.error()))
+#define UNROLL_EXPECTED_EX(name, exp)\
+if(!exp)\
+	return std::unexpected(exp.error());\
+auto name = exp.value()
+
 #endif
 #ifndef CRAFT_CUSTOM_ALLOCATION_SIZE
+#if CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 > 1024
+#pragma message( ": warning<Overflow>: CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 is greater than 1024. This may cause stack overflow. It is a good idea to increase the allocation size or decrease max expected stack args")
+#endif
 namespace Craft {
 	constexpr uint32_t cAllocSize = 4096;
 }
 #else
+#if CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 > CRAFT_CUSTOM_ALLOCATION_SIZE / 4
+#pragma message( ": warning<Overflow>: CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 is greater than CRAFT_CUSTOM_ALLOCATION_SIZE / 4. This may cause stack overflow. It is a good idea to increase the allocation size or decrease max expected stack args")
+#endif
 namespace Craft {
 	constexpr uint32_t cAllocSize = CRAFT_CUSTOM_ALLOCATION_SIZE;
 }
 #endif
+
+
+
+
 #ifndef SHADOW_SPACE_ALLOCATION_SIZE
 #define SHADOW_SPACE_ALLOCATION_SIZE 32
 #endif
@@ -96,6 +110,10 @@ namespace Craft {
 #endif
 #ifndef STACK_MAGIC_NUMBER
 #define STACK_MAGIC_NUMBER (SHADOW_SPACE_ALLOCATION_SIZE + RETURN_ADDRESS_SIZE)
+#endif
+
+#ifndef STATIC_ASSERT
+#define STATIC_ASSERT(condition, message) static_assert(condition, message)
 #endif
 namespace Craft
 {
