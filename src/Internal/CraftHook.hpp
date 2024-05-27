@@ -5,9 +5,25 @@
 #include <vector>
 #include <Internal/CraftASM.hpp>
 #include <Internal/CraftRegisterCalculations.hpp>
+#include <zasm/zasm.hpp>
+#include <functional>
 
 namespace Craft
 {
+    namespace details
+    {
+        struct InternalNeededHookInfo
+        {
+            NeededHookInfo& mNeededHookInfo; 
+            u8 mStackArgCount{};
+            u8 mRegArgCount{};
+            bool mReturnDataNeedsStack : 1 {0};
+
+
+        };
+
+
+    }
 
     enum class HookType : u8 // No need for more than 255 types
     {
@@ -21,24 +37,8 @@ namespace Craft
     class ManagerHook
     {
     private:
-        struct DataSync
-        {
-            UnkIntegral mArg1Value{};
-            UnkData mArg1Pointer{};
-            UnkIntegral mArg2Value{};
-            UnkData mArg2Pointer{};
-            UnkIntegral mArg3Value{};
-            UnkData mArg3Pointer{};
-            UnkIntegral mArg4Value{};
-            UnkData mArg4Pointer{};
-            TEST_ONLY(
-                u64 mStackPointer{};
-            )
-            DataSync() = default;
-        };
         std::vector<UnkFunc>* mPreHooks{};
         std::vector<UnkFunc>* mPostHooks{};
-        DataSync* mDataSync{};
         UnkFunc ReplaceHook{};
         struct OriginalFunc
         {
@@ -53,17 +53,22 @@ namespace Craft
 		};
         OriginalFunc mOriginalFunc{};
 		Trampoline mTrampoline{};
+        constexpr static std::array<u16, 4> mRegisterOffsets = { 16, 24, 32, 40 };
     private:
         jmp64 createThunk(UnkFunc targetAddress);  
         void setupMemory(UnkFunc originalFunc);
         void installThunk();
+        u16 getStackOffset(i16 stackMax, i16 index) {return abs(index - stackMax) - 4;} // Ok so. I might have cooked? I am not sure but I think this is right
+
         void generateASM(NeededHookInfo& hookInfo);
-        PointerWrapper VariableLocationToDataSyncLocation(VariableLocations location, bool isBackup);
-        TEST_ONLY(PointerWrapper getStackPointerAddress()
-        {
-            return &this->mDataSync->mStackPointer;
-        }
-        )
+
+        void createRegisterBackupASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
+        void createStackBackupASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
+        
+        void createFunctionHeadASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
+        void createFunctionTailASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
+
+
 
     public:
         ManagerHook() {}
@@ -75,7 +80,8 @@ namespace Craft
         void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, bool pauseThreads = true);
         
 
-        void AddHook(UnkFunc hookFunc, HookType hookType, bool pauseThreads = true);
+        void AddHook(UnkFunc hookFunc, HookType hookType); 
+        void RemoveHook(UnkFunc targetFunc, HookType hookType); // This force pauses all threads to prevent any issues
 
 
         void AddNewFuncToHooksWithNoProcess(UnkFunc ptr) 
