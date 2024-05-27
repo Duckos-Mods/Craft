@@ -16,7 +16,6 @@ namespace Craft
 
 		bool operator==(const MemAccess other) const {return read == other.read && write == other.write && execute == other.execute;}
 
-#if CRAFT_PLATFORM_WINDOWS == 1
 		std::expected<protType, OSErr> ToOsProtection() const
 		{
 			DWORD Protection = 0;
@@ -33,24 +32,6 @@ namespace Craft
 				return std::unexpected(OSErr::UNKNOWN_PROTECTION);
 			return Protection;
 		}
-#elif CRAFT_PLATFORM_LINUX == 1
-		std::expected<protType, OSErr> ToOsProtection() const
-		{
-			protType Protection = PROT_NONE;
-
-			if (*this == MemAccess{ true, false, false })
-				Protection = PROT_READ;
-			else if (*this == MemAccess{ true, false, true })
-				Protection = PROT_READ | PROT_WRITE;
-			else if (*this == MemAccess{ true, true, false })
-				Protection = PROT_READ | PROT_EXEC;
-			else if (*this == MemAccess{ true, true, true })
-				Protection = PROT_READ | PROT_WRITE | PROT_EXEC;
-			else
-				return std::unexpected(OSErr::UNKNOWN_PROTECTION);
-			return Protection;
-		}
-#endif
 	};
 	struct MemInfo
 	{
