@@ -29,6 +29,7 @@ namespace Craft
 	{
 		VariableLocations location = VariableLocations::Stack;
 		bool shouldTakeAddress = false;
+		u32 size = 0;
 	};
 	struct NeededHookInfo
 	{

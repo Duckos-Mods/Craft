@@ -29,6 +29,7 @@ namespace Craft
 	NeededTypeHookInfo InternalCalculations::ComputeTypeHookInfo(TypeInformation typeInfo, u16 index) 
 	{
 		NeededTypeHookInfo inf;
+		inf.size = typeInfo.size;
 		if (typeInfo.size > 8)
 			inf.shouldTakeAddress = false; // Anything larger than a 64 bit value even when passed by value is passed as a pointer then copied in the function
 		else

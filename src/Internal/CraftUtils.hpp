@@ -19,7 +19,8 @@ using protType = DWORD;
 #error "Unsupported platform"
 #endif
 
-#ifndef CRAFT_NO_DEBUG && _DEBUG
+
+#if !defined(CRAFT_NO_DEBUG) && defined(_DEBUG)
 #define CRAFT_DEBUG 1
 #ifndef DEBUG_ONLY
 #define DEBUG_ONLY(x) x
@@ -73,6 +74,16 @@ using protType = DWORD;
 #endif
 #endif
 
+
+// Check if MSVC
+#if defined(_MSC_VER)
+#define ALIGN_START(x) __declspec(align(x))
+#define ALIGN_END(x)
+#else
+#define ALIGN_START(x)
+#define ALIGN_END(x) __attribute__((aligned(x)))
+#endif
+
 #ifndef UNROLL_EXPECTED
 #define UNROLL_EXPECTED(exp) ((exp.has_value()) ? exp.value() : CRAFT_THROW(exp.error()))
 #define UNROLL_EXPECTED_EX(name, exp)\
@@ -110,6 +121,10 @@ namespace Craft {
 #endif
 #ifndef STACK_MAGIC_NUMBER
 #define STACK_MAGIC_NUMBER (SHADOW_SPACE_ALLOCATION_SIZE + RETURN_ADDRESS_SIZE)
+#endif
+
+#ifndef STACK_MAGIC_DEBUG_NUMBER
+#define STACK_MAGIC_DEBUG_NUMBER (0xDEADC0DE)
 #endif
 
 #ifndef STATIC_ASSERT
@@ -152,5 +167,25 @@ namespace Craft
 		T* as() const { return reinterpret_cast<T*>(pointer); }
 	};
 
+	template<typename T>
+	class TPointerWrapper
+	{
+	private:
+		PointerWrapper m_pointer;
+	public:
+		TPointerWrapper(T* ptr) : m_pointer(ptr) {}
+		TPointerWrapper() = default;
+		TPointerWrapper(u64 val) : m_pointer(val) {}
 
+		u64 value() const { return m_pointer.value; }
+
+		operator T* () const { return m_pointer.as<T>(); }
+		operator u64() const { return m_pointer; }
+		T* operator->() const { return m_pointer.as<T>(); }
+		T& operator*() const { return *m_pointer.as<T>(); }
+		template<typename U>
+		operator U* () const { return m_pointer.as<U>(); }
+		template<typename U>
+		U* as() const { return m_pointer.as<U>(); }
+	};
 }

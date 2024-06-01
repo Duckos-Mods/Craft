@@ -1,1 +1,6 @@
 subprojects/
+.vscode/
+.xmake
+build
+builddir-*
+CraftTests/
