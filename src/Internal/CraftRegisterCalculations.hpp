@@ -42,6 +42,7 @@ namespace Craft
 	constexpr TypeInformation GetTypeInformation()
 	{
 		TypeInformation info;
+
 		if constexpr (std::is_reference_v<T>)
 		{
 			info.size = 8;
@@ -55,6 +56,15 @@ namespace Craft
 		return info;
 	}
 
+	template<>
+	constexpr TypeInformation GetTypeInformation<void>()
+	{
+		TypeInformation info;
+		info.size = 0;
+		info.isFloat = false;
+		info.isPointer = false;
+		return info;
+	}
 
 	namespace InternalCalculations
 	{
