@@ -20,7 +20,7 @@ using protType = DWORD;
 #endif
 
 
-#if !defined(CRAFT_NO_DEBUG) && defined(_DEBUG)
+#if !defined(CRAFT_NO_DEBUG) && !defined(_NDEBUG)
 #define CRAFT_DEBUG 1
 #ifndef DEBUG_ONLY
 #define DEBUG_ONLY(x) x
@@ -90,42 +90,8 @@ using protType = DWORD;
 if(!exp)\
 	return std::unexpected(exp.error());\
 auto name = exp.value()
-
-#endif
-#ifndef CRAFT_CUSTOM_ALLOCATION_SIZE
-#if CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 > 1024
-#pragma message( ": warning<Overflow>: CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 is greater than 1024. This may cause stack overflow. It is a good idea to increase the allocation size or decrease max expected stack args")
-#endif
-namespace Craft {
-	constexpr uint32_t cAllocSize = 4096;
-}
-#else
-#if CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 > CRAFT_CUSTOM_ALLOCATION_SIZE / 4
-#pragma message( ": warning<Overflow>: CRAFT_MAX_EXPECTED_STACK_ARGS * 2 * 8 is greater than CRAFT_CUSTOM_ALLOCATION_SIZE / 4. This may cause stack overflow. It is a good idea to increase the allocation size or decrease max expected stack args")
-#endif
-namespace Craft {
-	constexpr uint32_t cAllocSize = CRAFT_CUSTOM_ALLOCATION_SIZE;
-}
 #endif
 
-
-
-
-#ifndef SHADOW_SPACE_ALLOCATION_SIZE
-#define SHADOW_SPACE_ALLOCATION_SIZE 32
-#endif
-#ifndef RETURN_ADDRESS_SIZE
-#define RETURN_ADDRESS_SIZE 8 
-// This isnt actually the size of the return address. This handles alignment due to shadow space being 32 bytes 
-// The return address is 8 bytes but since the stack pointer needs to be 16 aligned there is an extra 8 bytes pushed 
-#endif
-#ifndef STACK_MAGIC_NUMBER
-#define STACK_MAGIC_NUMBER (SHADOW_SPACE_ALLOCATION_SIZE + RETURN_ADDRESS_SIZE)
-#endif
-
-#ifndef STACK_MAGIC_DEBUG_NUMBER
-#define STACK_MAGIC_DEBUG_NUMBER (0xDEADC0DE)
-#endif
 
 #ifndef STATIC_ASSERT
 #define STATIC_ASSERT(condition, message) static_assert(condition, message)
