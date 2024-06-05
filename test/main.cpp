@@ -3,73 +3,69 @@
 #include <map>
 #include <list>
 #include <print>
+#include <chrono>
+#include <intrin.h>
 
-struct thing
-{
-    float x, y, z, w, f;
-};
 
 [[nodiscard]]
-static int HookTarget(int i, float, float, thing, thing*, thing*)
+int HookTarget()
 {
-    std::println("I={}", i++);
-    std::println("I={}", i++);
-    std::println("I={}", i++);
-    std::println("I={}", i++);
-    std::println("I={}", i++);
-    std::println("I={}", i++);
-    return i;
+    std::println("CALLED HookTarget");
+    return 69;
+}
+
+void* ogFunc = nullptr;
+
+
+[[nodiscard]]
+static int ReplaceHookTarget()
+{
+    return reinterpret_cast<int(*)()>(ogFunc)();
 }
 
 [[nodiscard]]
-static void PreHook(int& i, float&, float&, thing, thing&)
+static void PreHook()
 {
-	std::println("PreHook I={}", i);
+    std::println("PREHOOK");
+}
+[[nodiscard]]
+static void PostHook(int& returnData, float& i, int& j, int& k, int& l, uint64_t& m, int& n)
+{
+    std::println("Return Data: {}", returnData);
+    returnData++;
+    i++;
+    j++;
+    k++;
+    l++;
+    m++;
+    n++;
+    std::println("i: {}, j: {}, k: {}, l: {}, m: {}, n: {}", i, j, k, l, m, n);
 }
 
+int main(int argc, char** argv) {
 
-template <typename FunctionPtr>
-void* lftrw(FunctionPtr func)
-{
+    Craft::CraftContext ctx(argc, argv);
 
-    void* pFunction = *reinterpret_cast<void**>(&func);
+    Craft::ManagerHook hm;
+    auto returnTI = Craft::GetTypeInformation<int>();
+    std::vector<Craft::TypeInformation> argTIs;
+    
+    auto NHI = Craft::GetNeededHookInfo(returnTI, argTIs);
+    // Start timer
+    auto start = std::chrono::high_resolution_clock::now();
+    auto Func = Craft::NonStaticLocalFunctionToRealAddress(HookTarget);
+    hm.CreateManagerHook(Func, PreHook, NHI, Craft::HookType::PreHook, &ctx, true);
+    // Stop timer
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
+    std::println("Time taken to create hook: {} microseconds", duration.count());
 
-    char* ptr = reinterpret_cast<char*>(pFunction);
-    ptr++;
-    int32_t offset = *reinterpret_cast<int32_t*>(ptr);
-    ptr--;
-    uint64_t target = ((uint64_t)ptr + offset);
-    while (target % 16 != 0) {
-        target++;
-    }
-    return (void*)target;
-}
-[[noreturn]]
-int main()
-{
-    constexpr Craft::TypeInformation returnTi = Craft::GetTypeInformation<int>();
-    std::vector<Craft::TypeInformation> argTI;
-    argTI.push_back(Craft::GetTypeInformation<int>());
-    argTI.push_back(Craft::GetTypeInformation<float>());
-    argTI.push_back(Craft::GetTypeInformation<float>());
-    argTI.push_back(Craft::GetTypeInformation<thing>());
-    argTI.push_back(Craft::GetTypeInformation<thing*>());
-    argTI.push_back(Craft::GetTypeInformation<thing*>());
+    //hm.AddNewFuncToHooksWithNoProcess(PreHook);
+    //hm.AddPreNewFuncToHooksWithNoProcess(PostHook);
+    //hm.WriteReplaceBypass(ReplaceHookTarget);
 
-    Craft::NeededHookInfo nhi = Craft::GetNeededHookInfo(returnTi, argTI);
-
-
-    Craft::ManagerHook mh;
-    mh.CreateManagerHook(HookTarget, PreHook, nhi, Craft::HookType::PreHook);
-    auto* trampPointer = mh.GetTrampoline();
-    auto* tramp = reinterpret_cast<int(*)(int, float, float, thing, thing*, thing*)>(trampPointer);
-    int i = 50;
-    float f = 1.0f;
-    thing t1{ 1.0f, 2.0f, 3.0f, 4.0f, 5.0f };
-
-    tramp(i, f, 2.f, t1, (thing*)123456789, (thing*)987654321);
-
-
-    return 0;
+    ogFunc = hm.GetOriginalFunc();
+    HookTarget();
 
 }
+

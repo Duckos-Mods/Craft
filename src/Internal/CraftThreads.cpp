@@ -3,7 +3,7 @@
 namespace Craft
 {
 
-	AllOSThreads::AllOSThreads()
+	AllOSThreads::AllOSThreads() noexcept(false)
 	{
 		// Lock all threads
 		HANDLE hSnap = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
@@ -23,8 +23,9 @@ namespace Craft
 			if (te.th32OwnerProcessID == GetCurrentProcessId() && te.th32ThreadID != GetCurrentThreadId())
 			{
 				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
-				if (hThread == nullptr)
+				if (hThread == 0)
 					CloseHandle(hSnap);
+				_Analysis_assume_(hThread != 0);
 				SuspendThread(hThread);
 				CloseHandle(hThread);
 			}
@@ -54,6 +55,7 @@ namespace Craft
 				HANDLE hThread = OpenThread(THREAD_ALL_ACCESS, FALSE, te.th32ThreadID);
 				if (hThread == nullptr)
 					CloseHandle(hSnap);
+				_Analysis_assume_(hThread != 0);
 				ResumeThread(hThread);
 				CloseHandle(hThread);
 			}

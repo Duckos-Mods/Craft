@@ -5,13 +5,13 @@
 namespace Craft
 {
 	/*
-	* On construction locks all threads but the current one
-	* On destruction unlocks all threads
+	* RAII class to pause all OS threads that isnt the current thread. 
+	* Resumes all threads when the object goes out of scope.
 	*/
 	class AllOSThreads
 	{
 	public:
-		AllOSThreads();
+		AllOSThreads() noexcept(false);
 		~AllOSThreads() noexcept(false);
 
 		AllOSThreads(const AllOSThreads&) = delete;

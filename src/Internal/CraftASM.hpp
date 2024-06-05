@@ -44,6 +44,34 @@ namespace Craft
 
     };
 
+    struct jmp32
+    {
+        std::array<uint8_t, 5> code = {
+			0xE9,
+			0x0,
+			0x0,
+			0x0,
+			0x0
+		};
+        jmp32(uint32_t address)
+        {
+			uint8_t* codeData = code.data();
+			uint32_t* addressPtr = (uint32_t*)(codeData + 1);
+			*addressPtr = address;
+		}
+
+        uint8_t* GetASM()
+        {
+			return code.data();
+		}
+
+        std::span<uint8_t> GetASMSpan()
+        {
+			return code;
+		}
+
+    };
+
     class ASMBuff
     {
     private:

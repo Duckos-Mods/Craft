@@ -16,32 +16,9 @@
 #include <Windows.h>
 using protType = DWORD;
 #elif defined(__linux__)
-#define CRAFT_PLATFORM_LINUX 1
-#include <unistd.h>
-#include <sys/mman.h>
-#include <unistd.h>
-using protType = int;
-#else
 #error "Unsupported platform"
 #endif
 
-#ifndef CRAFT_NO_DEBUG && _DEBUG
-#define CRAFT_DEBUG 1
-#ifndef DEBUG_ONLY
-#define DEBUG_ONLY(x) x
-#endif
-#ifndef RELEASE_ONLY
-#define RELEASE_ONLY(x)
-#endif
-#else
-#define CRAFT_DEBUG 0
-#ifndef DEBUG_ONLY
-#define DEBUG_ONLY(x)
-#endif
-#ifndef RELEASE_ONLY
-#define RELEASE_ONLY(x) x
-#endif
-#endif
 #define CRAFT_TESTS 
 #ifdef CRAFT_TESTS
 #include <print>
@@ -51,7 +28,6 @@ using protType = int;
 #define TEST_ONLY(x)
 #define TEST_LOG(FORMAT, ...)
 #endif
-
 
 #if CRAFT_NO_THROW == 0 && CRAFT_CUSTOM_THROW == 0
 #include <exception>
@@ -74,28 +50,18 @@ using protType = int;
 #endif
 #endif
 
+
 #ifndef UNROLL_EXPECTED
 #define UNROLL_EXPECTED(exp) ((exp.has_value()) ? exp.value() : CRAFT_THROW(exp.error()))
+#define UNROLL_EXPECTED_EX(name, exp)\
+if(!exp)\
+	return std::unexpected(exp.error());\
+auto name = exp.value()
 #endif
-#ifndef CRAFT_CUSTOM_ALLOCATION_SIZE
-namespace Craft {
-	constexpr uint32_t cAllocSize = 4096;
-}
-#else
-namespace Craft {
-	constexpr uint32_t cAllocSize = CRAFT_CUSTOM_ALLOCATION_SIZE;
-}
-#endif
-#ifndef SHADOW_SPACE_ALLOCATION_SIZE
-#define SHADOW_SPACE_ALLOCATION_SIZE 32
-#endif
-#ifndef RETURN_ADDRESS_SIZE
-#define RETURN_ADDRESS_SIZE 8 
-// This isnt actually the size of the return address. This handles alignment due to shadow space being 32 bytes 
-// The return address is 8 bytes but since the stack pointer needs to be 16 aligned there is an extra 8 bytes pushed 
-#endif
-#ifndef STACK_MAGIC_NUMBER
-#define STACK_MAGIC_NUMBER (SHADOW_SPACE_ALLOCATION_SIZE + RETURN_ADDRESS_SIZE)
+
+
+#ifndef STATIC_ASSERT
+#define STATIC_ASSERT(condition, message) static_assert(condition, message)
 #endif
 namespace Craft
 {
@@ -134,5 +100,41 @@ namespace Craft
 		T* as() const { return reinterpret_cast<T*>(pointer); }
 	};
 
+	template<typename T>
+	class TPointerWrapper
+	{
+	private:
+		PointerWrapper m_pointer;
+	public:
+		TPointerWrapper(T* ptr) : m_pointer(ptr) {}
+		TPointerWrapper() = default;
+		TPointerWrapper(u64 val) : m_pointer(val) {}
 
+		u64 value() const { return m_pointer.value; }
+
+		operator T* () const { return m_pointer.as<T>(); }
+		operator u64() const { return m_pointer; }
+		T* operator->() const { return m_pointer.as<T>(); }
+		T& operator*() const { return *m_pointer.as<T>(); }
+		template<typename U>
+		operator U* () const { return m_pointer.as<U>(); }
+		template<typename U>
+		U* as() const { return m_pointer.as<U>(); }
+	};
+
+	static inline UnkFunc NonStaticLocalFunctionToRealAddress(PointerWrapper pointer)
+	{
+
+		void* pFunction = pointer;
+
+		char* ptr = reinterpret_cast<char*>(pFunction);
+		ptr++;
+		int32_t offset = *reinterpret_cast<int32_t*>(ptr);
+		ptr--;
+		uint64_t target = ((uint64_t)ptr + offset);
+		while (target % 16 != 0) {
+			target++;
+		}
+		return (void*)target;
+	}
 }

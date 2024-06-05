@@ -29,18 +29,21 @@ namespace Craft
 	{
 		VariableLocations location = VariableLocations::Stack;
 		bool shouldTakeAddress = false;
+		u32 size = 0;
 	};
 	struct NeededHookInfo
 	{
 		std::vector<NeededTypeHookInfo> argumentLocationInfo{};
 		bool ShouldPassReturnValue = false;
 		bool ShouldUseWideRegisters = false;
+		u32 ReturnArgSize{};
 	};
 
 	template<typename T>
 	constexpr TypeInformation GetTypeInformation()
 	{
 		TypeInformation info;
+
 		if constexpr (std::is_reference_v<T>)
 		{
 			info.size = 8;
@@ -54,6 +57,15 @@ namespace Craft
 		return info;
 	}
 
+	template<>
+	constexpr TypeInformation GetTypeInformation<void>()
+	{
+		TypeInformation info;
+		info.size = 0;
+		info.isFloat = false;
+		info.isPointer = false;
+		return info;
+	}
 
 	namespace InternalCalculations
 	{
