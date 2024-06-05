@@ -45,8 +45,8 @@ namespace Craft::ASMUtil
 			return 0;
 		}
 
-		int AsmPrinterVariant = MAI->getAssemblerDialect();
-		std::unique_ptr<MCInstPrinter> IP(target->createMCInstPrinter(TheTriple, AsmPrinterVariant, *MAI, *MII, *MRI));
+		// we hard coded 1 because  it gives me intel syntax and thats the only true syntax AT&T is a lie
+		std::unique_ptr<MCInstPrinter> IP(target->createMCInstPrinter(TheTriple, 1, *MAI, *MII, *MRI));
 
 		ArrayRef<uint8_t> code((uint8_t*)ASM, minBytesNeeded * 10); // 10 is a guess
 		uint64_t index = 0;
