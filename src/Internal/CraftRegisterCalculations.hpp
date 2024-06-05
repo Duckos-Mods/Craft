@@ -36,6 +36,7 @@ namespace Craft
 		std::vector<NeededTypeHookInfo> argumentLocationInfo{};
 		bool ShouldPassReturnValue = false;
 		bool ShouldUseWideRegisters = false;
+		u32 ReturnArgSize{};
 	};
 
 	template<typename T>

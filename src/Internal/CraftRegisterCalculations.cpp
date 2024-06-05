@@ -8,6 +8,7 @@ namespace Craft
 		inf.argumentLocationInfo.reserve(functionArguments.size()); 
 		inf.ShouldPassReturnValue = InternalCalculations::GetPassReturn(returnTypeInfo);
 		inf.ShouldUseWideRegisters = InternalCalculations::GetShouldUseWideRgister(returnTypeInfo);
+		inf.ReturnArgSize = returnTypeInfo.size;
 		u16 loopCount = ((u16)functionArguments.size() > 4) ? 4 : (u16)functionArguments.size();
 
 		for (u16 i = 0; i < loopCount; i++)
@@ -31,7 +32,7 @@ namespace Craft
 		NeededTypeHookInfo inf;
 		inf.size = typeInfo.size;
 		if (typeInfo.size > 8)
-			inf.shouldTakeAddress = false; // Anything larger than a 64 bit value even when passed by value is passed as a pointer then copied in the function
+			inf.shouldTakeAddress = true; 
 		else
 		{
 			if (typeInfo.isPointer)
