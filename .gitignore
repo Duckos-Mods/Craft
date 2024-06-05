@@ -4,3 +4,4 @@ subprojects/
 build
 builddir-*
 CraftTests/
+vsxmake*/
