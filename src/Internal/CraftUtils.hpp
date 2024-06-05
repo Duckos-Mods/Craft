@@ -19,24 +19,6 @@ using protType = DWORD;
 #error "Unsupported platform"
 #endif
 
-
-#if !defined(CRAFT_NO_DEBUG) && !defined(_NDEBUG)
-#define CRAFT_DEBUG 1
-#ifndef DEBUG_ONLY
-#define DEBUG_ONLY(x) x
-#endif
-#ifndef RELEASE_ONLY
-#define RELEASE_ONLY(x)
-#endif
-#else
-#define CRAFT_DEBUG 0
-#ifndef DEBUG_ONLY
-#define DEBUG_ONLY(x)
-#endif
-#ifndef RELEASE_ONLY
-#define RELEASE_ONLY(x) x
-#endif
-#endif
 #define CRAFT_TESTS 
 #ifdef CRAFT_TESTS
 #include <print>
@@ -45,12 +27,6 @@ using protType = DWORD;
 #else
 #define TEST_ONLY(x)
 #define TEST_LOG(FORMAT, ...)
-#endif
-
-#ifndef CRAFT_MAX_EXPECTED_STACK_ARGS
-#define CRAFT_MAX_EXPECTED_STACK_ARGS 32
-#elif CRAFT_MAX_EXPECTED_STACK_ARGS < 4
-#error "CRAFT_MAX_EXPECTED_STACK_ARGS must be greater than 4. A value higer or equal to 32 is ideal"
 #endif
 
 #if CRAFT_NO_THROW == 0 && CRAFT_CUSTOM_THROW == 0
@@ -74,15 +50,6 @@ using protType = DWORD;
 #endif
 #endif
 
-
-// Check if MSVC
-#if defined(_MSC_VER)
-#define ALIGN_START(x) __declspec(align(x))
-#define ALIGN_END(x)
-#else
-#define ALIGN_START(x)
-#define ALIGN_END(x) __attribute__((aligned(x)))
-#endif
 
 #ifndef UNROLL_EXPECTED
 #define UNROLL_EXPECTED(exp) ((exp.has_value()) ? exp.value() : CRAFT_THROW(exp.error()))
@@ -154,4 +121,20 @@ namespace Craft
 		template<typename U>
 		U* as() const { return m_pointer.as<U>(); }
 	};
+
+	static inline UnkFunc NonStaticLocalFunctionToRealAddress(PointerWrapper pointer)
+	{
+
+		void* pFunction = pointer;
+
+		char* ptr = reinterpret_cast<char*>(pFunction);
+		ptr++;
+		int32_t offset = *reinterpret_cast<int32_t*>(ptr);
+		ptr--;
+		uint64_t target = ((uint64_t)ptr + offset);
+		while (target % 16 != 0) {
+			target++;
+		}
+		return (void*)target;
+	}
 }
