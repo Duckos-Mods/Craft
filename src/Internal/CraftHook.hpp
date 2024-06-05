@@ -5,42 +5,27 @@
 #include <vector>
 #include <Internal/CraftASM.hpp>
 #include <Internal/CraftRegisterCalculations.hpp>
-#include <zasm/zasm.hpp>
 #include <functional>
+#include <llvm/Support/InitLLVM.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Support/Host.h>
+#include <llvm/Support/raw_ostream.h>
+#include <clang/Tooling/Tooling.h>
+#include <clang/Frontend/CompilerInstance.h>
+#include <clang/Frontend/TextDiagnosticPrinter.h>
+#include <clang/CodeGen/CodeGenAction.h>
+#include <clang/Driver/Options.h>
+#include <clang/Driver/Driver.h>
+#include <clang/Driver/Compilation.h>
+#include <clang/Driver/ToolChain.h>
+#include <clang/Driver/Types.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/MemoryBuffer.h>
+#include <llvm/Target/TargetMachine.h>
+#include <Internal/CraftContext.hpp>
 
 namespace Craft
 {
-    constexpr uSize stackBackupCount = CRAFT_MAX_EXPECTED_STACK_ARGS * 2;
-    constexpr uSize stackBackupSize = sizeof(std::array<UnkData, stackBackupCount>);
-    namespace details
-    {
-        struct InternalNeededHookInfo
-        {
-            NeededHookInfo& mNeededHookInfo; 
-            u8 mStackArgCount{};
-            u8 mRegArgCount{};
-            bool mReturnDataNeedsStack : 1 {0};
-            bool mNonReturnNeeds8Pad : 1 {0};
-            bool mReturnNeeds8Pad : 1 {0};
-            u32 mStackOffset{};
-        };
-
-        union alignas(16) XMM0Backup
-        {
-            std::array<f32, 4> mFloats;
-            std::array<f64, 2> mDoubles;
-            std::array<u8, 16> mBytes;
-            std::array<u64, 2> mInts;
-            std::array<u32, 4> mInts32;
-            std::array<u16, 8> mInts16;
-            std::array<i8, 16> mSignedInts8;
-            std::array<i16, 8> mSignedInts16;
-            std::array<i32, 4> mSignedInts32;
-            std::array<i64, 2> mSignedInts64;
-        };
-
-
-    }
 
     enum class HookType : u8 // No need for more than 255 types
     {
@@ -51,46 +36,63 @@ namespace Craft
         Inline = 0x20, // Experimental Will Not Work Most Likely
     };
 
+    enum class HookError : u8
+    {
+        DecideHookAlreadySet,
+        ReplaceHookAlreadySet,
+    };
+
+    namespace Internal
+    {
+        struct InternalHookInfo
+		{
+            InternalHookInfo(NeededHookInfo& hookInfo) : mHookInfo(hookInfo), mCompilerInstance() {}
+            NeededHookInfo& mHookInfo;
+            CraftContext* mContext = nullptr;
+            clang::CompilerInstance mCompilerInstance;
+            std::string mSource;
+		};
+
+    }
+
+    constexpr uSize cAllocSize = 4096;
     class ManagerHook
     {
-    private:
+    protected: // Marked as protected so if someone inherits from this class to add extra stuff they can modify them. We dont make functions virtual cuz of overhead
         TPointerWrapper<std::vector<UnkFunc>> mPreHooks{};
         TPointerWrapper<std::vector<UnkFunc>> mPostHooks{};
-        TPointerWrapper<std::array<UnkData, stackBackupCount>> mStackBackups{};
-        TPointerWrapper<details::XMM0Backup> mXMM0Backup{};
-        TPointerWrapper<u64> mStackOffset{};
-        UnkFunc ReplaceHook{};
+        TPointerWrapper<UnkFunc> mReplaceCallback;
+        TPointerWrapper<UnkFunc> mDecideCallback;
+
         struct OriginalFunc
         {
             u8* mOriginalBytes{};
             uSize mSize{};
-            UnkFunc mOriginalFunc{};
+            UnkFunc mCallback{};
+            UnkFunc mOldFunc{}; // This is the old function that was replaced
         };
         struct Trampoline
         {
 			u8* mTrampoline{};
 			uSize mSize{};
 		};
+
+        struct CompileResult {
+            std::unique_ptr<llvm::LLVMContext> C;
+            std::unique_ptr<llvm::Module> M;
+        };
         OriginalFunc mOriginalFunc{};
 		Trampoline mTrampoline{};
-        constexpr static std::array<u16, 4> mRegisterOffsets = { 8, 16, 24, 32 };
-    private:
+    protected:
         jmp64 createThunk(UnkFunc targetAddress);  
         void setupMemory(UnkFunc originalFunc);
         void installThunk();
-        u16 getStackOffset(i16 index) {return index - 3;} // Ok so. I might have cooked? I am not sure but I think this is right
 
-        void generateASM(NeededHookInfo& hookInfo);
-
-        void createRegisterBackupASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
-        void createStackBackupASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
-        void createPreHookCallingASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
-        void createFunctionCallASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a, bool appendRax = false);
-
-        void createReadOffsetASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
-
-        void createFunctionHeadASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
-        void createFunctionTailASM(details::InternalNeededHookInfo& hookInfo, zasm::x86::Assembler& a);
+        void generateASM(NeededHookInfo& hookInfo, CraftContext* context);
+        void generateSource(Internal::InternalHookInfo&);
+        llvm::Expected<std::unique_ptr<llvm::TargetMachine>> createTargetMachine(CompileResult& compResult, CraftContext* ctx);
+        llvm::Expected<CompileResult> compileSource(Internal::InternalHookInfo&);
+        void emitMachineCode(CompileResult& compResult, llvm::TargetMachine& target);
 
 
 
@@ -101,17 +103,28 @@ namespace Craft
         ManagerHook(ManagerHook&&) = default;
         ManagerHook& operator=(ManagerHook&&) = default;
 
-        void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, bool pauseThreads = true);
+        void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, CraftContext* ctx, bool pauseThreads = true);
         
 
-        void AddHook(UnkFunc hookFunc, HookType hookType); 
+        HookError AddHook(UnkFunc hookFunc, HookType hookType);
         void RemoveHook(UnkFunc targetFunc, HookType hookType); // This force pauses all threads to prevent any issues
+        UnkFunc GetOriginalFunc() { return this->mOriginalFunc.mCallback; }
 
 
-        void AddNewFuncToHooksWithNoProcess(UnkFunc ptr) 
-        { 
+        void AddNewFuncToHooksWithNoProcess(UnkFunc ptr)
+        {
             this->mPreHooks->push_back(ptr);
         }
+        void AddPreNewFuncToHooksWithNoProcess(UnkFunc ptr)
+        {
+            this->mPostHooks->push_back(ptr);
+        }
+        void WriteReplaceBypass(UnkFunc ptr)
+		{
+            auto bp = this->mReplaceCallback.as<u64>();
+            *bp = reinterpret_cast<u64>(ptr);
+		}
+
         UnkFunc GetTrampoline() { return this->mTrampoline.mTrampoline; }
         
 
