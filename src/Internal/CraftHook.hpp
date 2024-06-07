@@ -23,6 +23,8 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Target/TargetMachine.h>
 #include <Internal/CraftContext.hpp>
+#include <variant>
+#include <expected>
 
 namespace Craft
 {
@@ -40,6 +42,7 @@ namespace Craft
     {
         DecideHookAlreadySet,
         ReplaceHookAlreadySet,
+        AllocationError
     };
 
     namespace Internal
@@ -53,9 +56,25 @@ namespace Craft
             std::string mSource;
 		};
 
+        //using JmpInterface = std::variant<jmp64, jmp32>;
+        class alignas(8) JmpInterface : private std::variant<jmp64, jmp32>
+        {
+        public:
+            JmpInterface() : std::variant<jmp64, jmp32>(jmp32(0)) {}
+            JmpInterface(jmp64 jmp) : std::variant<jmp64, jmp32>(jmp) {}
+            JmpInterface(jmp32 jmp) : std::variant<jmp64, jmp32>(jmp) {}
+            template<typename T> requires std::is_same_v<T, jmp64> || std::is_same_v<T, jmp32>
+            JmpInterface(T jmp) : std::variant<jmp64, jmp32>(jmp) {}
+            bool Is64() const { return std::holds_alternative<jmp64>(*this); }
+            bool Is32() const { return std::holds_alternative<jmp32>(*this); }
+            uSize GetHookSize() const { return std::holds_alternative<jmp64>(*this) ? 14 : 5; }
+            static uSize Get32Size() { return 5; }
+            static uSize Get64Size() { return 14; }
+            u8* GetASM() { return std::holds_alternative<jmp64>(*this) ? std::get<jmp64>(*this).GetASM() : std::get<jmp32>(*this).GetASM(); }
+        };
     }
 
-    constexpr uSize cAllocSize = 4096;
+    constexpr uSize cAllocSize = CRAFT_ALLOCATION_SIZE;
     class ManagerHook
     {
     protected: // Marked as protected so if someone inherits from this class to add extra stuff they can modify them. We dont make functions virtual cuz of overhead
@@ -83,8 +102,12 @@ namespace Craft
         };
         OriginalFunc mOriginalFunc{};
 		Trampoline mTrampoline{};
+        Internal::JmpInterface mJmpInterface{};
+        bool mCanShortJump = false;
     protected:
-        jmp64 createThunk(UnkFunc targetAddress);  
+        jmp64 createThunk64(UnkFunc targetAddress);  
+        jmp32 createThunk32(i32 targetOffset);
+        std::expected<TPointerWrapper<u8>, HookError> allocateMemory(UnkFunc originalFunc);
         void setupMemory(UnkFunc originalFunc);
         void installThunk();
 
@@ -103,7 +126,7 @@ namespace Craft
         ManagerHook(ManagerHook&&) = default;
         ManagerHook& operator=(ManagerHook&&) = default;
 
-        void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, CraftContext* ctx, bool pauseThreads = true);
+        void CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, CraftContext* ctx);
         
 
         HookError AddHook(UnkFunc hookFunc, HookType hookType);

@@ -8,9 +8,10 @@
 
 
 [[nodiscard]]
-int HookTarget()
+int HookTarget(int i, int b)
 {
-    std::println("CALLED HookTarget");
+    i+= b;
+    std::println("CALLED HookTarget i = {}", i);
     return 69;
 }
 
@@ -49,12 +50,13 @@ int main(int argc, char** argv) {
     Craft::ManagerHook hm;
     auto returnTI = Craft::GetTypeInformation<int>();
     std::vector<Craft::TypeInformation> argTIs;
-    
+    argTIs.push_back(Craft::GetTypeInformation<int>());
+    argTIs.push_back(Craft::GetTypeInformation<int>());
     auto NHI = Craft::GetNeededHookInfo(returnTI, argTIs);
     // Start timer
     auto start = std::chrono::high_resolution_clock::now();
     auto Func = Craft::NonStaticLocalFunctionToRealAddress(HookTarget);
-    hm.CreateManagerHook(Func, PreHook, NHI, Craft::HookType::PreHook, &ctx, true);
+    hm.CreateManagerHook(Func, PreHook, NHI, Craft::HookType::PreHook, &ctx);
     // Stop timer
     auto stop = std::chrono::high_resolution_clock::now();
     auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop - start);
@@ -65,7 +67,7 @@ int main(int argc, char** argv) {
     //hm.WriteReplaceBypass(ReplaceHookTarget);
 
     ogFunc = hm.GetOriginalFunc();
-    HookTarget();
+    HookTarget(1, 1);
 
 }
 

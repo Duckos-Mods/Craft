@@ -52,19 +52,18 @@ namespace Craft
 
 	constexpr uSize vecSize = sizeof(std::vector<UnkFunc>);
 	constexpr uSize UnkFuncSize = sizeof(UnkFunc);
-	jmp64 ManagerHook::createThunk(UnkFunc targetAddress)
+
+	jmp64 ManagerHook::createThunk64(UnkFunc targetAddress)
 	{
 		return jmp64(reinterpret_cast<u64>(targetAddress));
 	}
+	jmp32 ManagerHook::createThunk32(i32 targetOffset)
+	{
+		return jmp32(targetOffset);
+	}
 	void ManagerHook::setupMemory(UnkFunc originalFunc)
 	{
-		u8* memory = (u8*)UNROLL_EXPECTED(OSAlloc(
-			cAllocSize,
-			{ true, true, true },
-			originalFunc,
-			Sizes::GiB * 2) // 2 Gib in each direction from code
-		);
-		// "Failed to allocate memory for hooking function"
+		u8* memory = (u8*)UNROLL_EXPECTED(allocateMemory(originalFunc));
 
 		OSErr err = OSProtect(
 			originalFunc,
@@ -86,22 +85,29 @@ namespace Craft
 
 
 		// I am not sure if this is the best way to do this but it works
-		this->mOriginalFunc.mSize = (u32)ASMUtil::GetMinBytesForNeededSize(originalFunc, 14);
-		uSize allocFirstSize = this->mOriginalFunc.mSize;
-		currentAllocateHead -= allocFirstSize;
-		this->mOriginalFunc.mOriginalBytes = new(currentAllocateHead) u8[allocFirstSize];
-		allocFirstSize += 14;
-		currentAllocateHead -= allocFirstSize;
-		this->mOriginalFunc.mCallback = new(currentAllocateHead) u8[allocFirstSize];
+		if (this->mCanShortJump)
+		{
+			this->mOriginalFunc.mSize = (u32)ASMUtil::GetMinBytesForNeededSize(originalFunc, Internal::JmpInterface::Get32Size());
+			uSize allocFirstSize = this->mOriginalFunc.mSize;
+			currentAllocateHead -= allocFirstSize;
+			this->mOriginalFunc.mOriginalBytes = new(currentAllocateHead) u8[allocFirstSize];
+			allocFirstSize += Internal::JmpInterface::Get32Size();
+			currentAllocateHead -= allocFirstSize;
+			this->mOriginalFunc.mCallback = new(currentAllocateHead) u8[allocFirstSize];
+		}
+		else
+		{
+			this->mOriginalFunc.mSize = (u32)ASMUtil::GetMinBytesForNeededSize(originalFunc, Internal::JmpInterface::Get64Size());
+			uSize allocFirstSize = this->mOriginalFunc.mSize;
+			currentAllocateHead -= allocFirstSize;
+			this->mOriginalFunc.mOriginalBytes = new(currentAllocateHead) u8[allocFirstSize];
+			allocFirstSize += Internal::JmpInterface::Get64Size();
+			currentAllocateHead -= allocFirstSize;
+			this->mOriginalFunc.mCallback = new(currentAllocateHead) u8[allocFirstSize];
+		}
 
-
-		//this->mOriginalFunc.mOriginalBytes = new u8[this->mOriginalFunc.mSize];
-		/*auto memAlloc = OSAlloc(this->mOriginalFunc.mSize + 14, { true, true, true }, originalFunc);
-		if (!memAlloc.has_value())
-			CRAFT_THROW("Failed to allocate memory for original function");*/
-
-			//new u8[this->mOriginalFunc.mSize + 14]; 
 		memcpy(this->mOriginalFunc.mOriginalBytes, originalFunc, this->mOriginalFunc.mSize);
+		memset(this->mOriginalFunc.mOldFunc, 0xCC, this->mOriginalFunc.mSize);
 
 		this->mTrampoline.mSize = cAllocSize;
 		this->mTrampoline.mTrampoline = memory;
@@ -109,15 +115,44 @@ namespace Craft
 	}
 	void ManagerHook::installThunk()
 	{
-		jmp64 jmpToTrampoline = createThunk(this->mTrampoline.mTrampoline);
-		jmp64 jmpBackToOgFunction = createThunk((u8*)this->mOriginalFunc.mOldFunc + this->mOriginalFunc.mSize);
+		auto thunkOgAddress = (u8*)this->mOriginalFunc.mOldFunc + this->mOriginalFunc.mSize;
+		Internal::JmpInterface jmpToTrampoline;
+		Internal::JmpInterface jmpBackToOgFunction;
+		if (this->mCanShortJump)
+		{
+			/*jmpToTrampoline = createThunk32(this->mTrampoline.mTrampoline);
+			jmpBackToOgFunction = createThunk32(thunkOgAddress);*/
+			//(i64)this->mTrampoline.mTrampoline - (i64)thunkOgAddress;
+			//i32 offsetToTrampoline = (i64)this->mTrampoline.mTrampoline - (i64)thunkOgAddress;
+			//if (offsetToTrampoline < 0)
+			//	offsetToTrampoline += 5; // This is the size of the jump
+			//else
+			//	offsetToTrampoline -= 5;
+			//auto callbackOffset = (u64)this->mOriginalFunc.mCallback + this->mOriginalFunc.mSize;
+			//i32 offsetToOgFunc = (i64)thunkOgAddress - (i64)(callbackOffset);
+			//if (offsetToOgFunc < 0)
+			//	offsetToOgFunc += 5;
+			//else
+			//	offsetToOgFunc -= 5;
+			i32 offsetToTrampoline = (u64)this->mTrampoline.mTrampoline - (u64)thunkOgAddress - 5;
+			i32 offsetToOgFunc = (u64)thunkOgAddress - (u64)this->mOriginalFunc.mCallback - this->mOriginalFunc.mSize - 5;
+			jmpToTrampoline = createThunk32(offsetToTrampoline);
+			jmpBackToOgFunction = createThunk32(offsetToOgFunc);
+		}
+		else
+		{
+			jmpToTrampoline = createThunk64(this->mTrampoline.mTrampoline);
+			jmpBackToOgFunction = createThunk64(thunkOgAddress);
+		}
 		UnkFunc callback = this->mOriginalFunc.mCallback;
+		u8* JmpToTrampoline = jmpToTrampoline.GetASM();
+		uSize JmpToTrampCopySize = jmpToTrampoline.GetHookSize();
+		uSize JmpBackToOgFuncSize = jmpBackToOgFunction.GetHookSize();
+		u8* JmpBackToOgFunc = jmpBackToOgFunction.GetASM();
+
 		memcpy(callback, this->mOriginalFunc.mOriginalBytes, this->mOriginalFunc.mSize);
-		memcpy((u8*)callback + this->mOriginalFunc.mSize, jmpBackToOgFunction.GetASM(), 14);
-		memcpy(this->mOriginalFunc.mOldFunc, jmpToTrampoline.GetASM(), 14);
-
-
-
+		memcpy((u8*)callback + this->mOriginalFunc.mSize, JmpBackToOgFunc, JmpBackToOgFuncSize);
+		memcpy(this->mOriginalFunc.mOldFunc, JmpToTrampoline, JmpToTrampCopySize);
 	}
 
 	void ManagerHook::generateASM(NeededHookInfo& hookInfo, CraftContext* context)
@@ -509,6 +544,32 @@ namespace Craft
 		return CompileResult{ std::unique_ptr<llvm::LLVMContext>(ctx), std::move(mod)};
 	}
 
+	std::expected<TPointerWrapper<u8>, HookError> ManagerHook::allocateMemory(UnkFunc originalFunc)
+	{
+		auto mem = OSAlloc(
+			cAllocSize,
+			{ true, true, true },
+			originalFunc,
+			Sizes::GiB * 2
+		);
+		if (mem.has_value())
+		{
+			this->mCanShortJump = true;
+			return (u8*)mem.value();
+		}
+		if (mem.error() != OSErr::NO_MEMORY_IN_RANGE)
+			return std::unexpected(HookError::AllocationError);
+		this->mCanShortJump = false;
+		mem = OSAlloc(
+			cAllocSize,
+			{ true, true, true },
+			originalFunc
+		);
+		if (mem.has_value())
+			return (u8*)mem.value();
+		return std::unexpected(HookError::AllocationError);
+	}
+
 	void ManagerHook::emitMachineCode(CompileResult& compResult, llvm::TargetMachine& targetMachine)
 	{
 		using namespace llvm;
@@ -554,10 +615,9 @@ namespace Craft
 		ctx.release();
 	}
 
-	void ManagerHook::CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, CraftContext* ctx, bool pauseThreads)
+	void ManagerHook::CreateManagerHook(UnkFunc originalFunc, UnkFunc targetFunc, NeededHookInfo& hookInfo, HookType hookType, CraftContext* ctx)
 	{
-		if (pauseThreads)
-			AllOSThreads pauseThreads{}; // This auto releases when it goes out of scope so we dont have to worry about it
+		AllOSThreads pauseThreads{}; // This auto releases when it goes out of scope so we dont have to worry about it
 		this->mOriginalFunc.mOldFunc = originalFunc;
 		setupMemory(originalFunc);
 		generateASM(hookInfo, ctx);

@@ -28,6 +28,9 @@ using protType = DWORD;
 #define TEST_ONLY(x)
 #define TEST_LOG(FORMAT, ...)
 #endif
+#ifndef CRAFT_ALLOCATION_SIZE
+#define CRAFT_ALLOCATION_SIZE 0x1000
+#endif
 
 #if CRAFT_NO_THROW == 0 && CRAFT_CUSTOM_THROW == 0
 #include <exception>

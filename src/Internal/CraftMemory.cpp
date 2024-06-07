@@ -74,17 +74,22 @@ namespace Craft
 		if (maxAddress == baseAddress)
 			maxAddress = (u64)GetMemInfo().maxAddress;
 
+		protType prot;
+		auto acc = access.ToOsProtection();
+		if (!acc.has_value())
+			return std::unexpected(OSErr::UNKNOWN_PROTECTION);
+		prot = acc.value();
 		PointerWrapper currentAddress = baseAddress;
 		while (currentAddress < maxAddress)
 		{
 			PointerWrapper alignedUp = AlignUp(currentAddress, alignment);
 
-			auto allocated = RawOsAlloc(alignedUp, Count, access.ToOsProtection().value());
+			auto allocated = RawOsAlloc(alignedUp, Count, prot);
 			if (allocated.has_value())
 				return allocated;
 			currentAddress = currentAddress.value + GetMemInfo().allocationGranularity;
 		}
-		return std::unexpected(OSErr::ALLOCATE);
+		return std::unexpected(OSErr::NO_MEMORY_IN_RANGE);
     }
 	OSErr OSProtect(void* address, uSize size, MemAccess access)
 	{

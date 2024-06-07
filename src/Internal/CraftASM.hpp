@@ -53,7 +53,7 @@ namespace Craft
 			0x0,
 			0x0
 		};
-        jmp32(uint32_t address)
+        jmp32(i32 address)
         {
 			uint8_t* codeData = code.data();
 			uint32_t* addressPtr = (uint32_t*)(codeData + 1);
